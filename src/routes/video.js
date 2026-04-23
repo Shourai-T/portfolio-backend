@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const youtubeController = require('../controllers/youtube');
+const twitterController = require('../controllers/twitter');
 
 // Platform detection helper
 const getPlatform = (url) => {
@@ -21,6 +22,8 @@ router.get('/info', async (req, res) => {
     switch (platform) {
         case 'youtube':
             return youtubeController.getVideoInfo(req, res);
+        case 'twitter':
+            return twitterController.getVideoInfo(req, res);
         case 'tiktok':
         case 'facebook':
         case 'instagram':
@@ -39,6 +42,8 @@ router.get('/download', async (req, res) => {
     switch (platform) {
         case 'youtube':
             return youtubeController.downloadVideo(req, res);
+        case 'twitter':
+            return twitterController.downloadVideo(req, res);
         case 'tiktok':
         case 'facebook':
         case 'instagram':

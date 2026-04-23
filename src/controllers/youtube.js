@@ -13,26 +13,20 @@ exports.getVideoInfo = async (req, res) => {
         const { videoDetails, formats } = info;
         
         // Filter and Map formats
-        // we want video+audio formats or distinct video formats + audio only
-        // Ideally we want 1080p, 720p, 480p, 360p with audio if possible.
-        // ytdl formats usually separate video and audio for high quality.
-        // For simplicity in a basic downloader, we might offer "video with audio" (often limited to 720p) OR
-        // Stream both and merge? (Needs ffmpeg on server, expensive).
-        // User prompt says: "Stream video directly, no server storage".
-        // If we stream directly, we can only stream ONE resource.
-        // If high quality 1080p is video-only, the user gets no audio.
-        // Workaround: Suggest formats that have both (usually up to 720p).
-        // OR stream "Audio Only" as mp3.
+        // 1. Get Mixed Formats (Video + Audio) - usually capped at 720p
+        const mixedFormats = formats.filter(f => f.hasVideo && f.hasAudio);
         
-        // Let's list formats matching user request.
-        
-        const videoFormats = formats
-            .filter(f => f.hasVideo && f.hasAudio) // formats with both (usually up to 720p)
+        // 2. Get Video Only Formats (High Qual) - usually 1080p, 2K, 4K
+        // Sort by resolution descending
+        const videoOnlyFormats = formats
+            .filter(f => f.hasVideo && !f.hasAudio && f.height > 720) // Only show video-only if better than 720p
             .sort((a, b) => b.height - a.height);
             
-        // Also look for video-only formats if they want 1080p+ (warn user no audio?)
-        // Or simply provide what's available combined.
-        
+        // Combine them: Best video-only first (if any), then mixed formats
+        // This gives user option to download 1080p (silent) or 720p (sound)
+        const allVideoFormats = [...videoOnlyFormats, ...mixedFormats]
+             .sort((a, b) => b.height - a.height);
+
         // Audio formats
         const audioFormats = formats.filter(f => f.hasAudio && !f.hasVideo);
 
@@ -41,16 +35,18 @@ exports.getVideoInfo = async (req, res) => {
         // Helper to check uniqueness
         const seen = new Set();
         
-        videoFormats.forEach(f => {
-            if (!seen.has(f.qualityLabel)) {
+        allVideoFormats.forEach(f => {
+            // Uniqueness key: Quality Label + Container
+            const key = `${f.qualityLabel}-${f.container}`;
+            if (!seen.has(key)) {
                 availableFormats.push({
                     itag: f.itag,
                     quality: f.qualityLabel,
                     container: f.container,
                     type: 'video',
-                    hasAudio: true
+                    hasAudio: !!f.hasAudio
                 });
-                seen.add(f.qualityLabel);
+                seen.add(key);
             }
         });
         
